@@ -1,14 +1,27 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-<div class="container-fluid">
+<div class="container">
 
     <div align=center>
-        <a href="/"><b>Kembali</b></a>
-        <br>
-        <img src={{filename}} >
-        <br>
-        {{kelas}}
+        <a class="btn btn-primary" href="/"><b>Kembali</b></a>
+        <div class="res_image">
+            <img src={{filename}} width="300" height="300">
+        </div>
+        <div class="row justify-content-center"></div>
+            <div class="col col-sm-4"></div>
+            <div class="card col col-sm-2">
+                <div class="card-body">
+                    {{kelas}}
+                </div>
+            </div>
+            <div class="card col col-sm-2">
+                <div class="card-body">
+                    {{persen}}%
+                </div>
+            </div>
+            <div class="col col-sm-4"></div>
+        </div>
     </div>
 
 </div>

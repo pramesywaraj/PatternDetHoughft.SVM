@@ -49,7 +49,7 @@ def upload():
         img = list(itertools.chain.from_iterable(img.getdata()))
         predClazz, prob = predict(models, img)
         print(prob)
-        return render_template('hasil.html', filename=location ,kelas=str(predClazz))
+        return render_template('hasil.html', filename=location , kelas=str(predClazz), persen=round(prob*100, 2))
 
     return render_template('index.html')
 
