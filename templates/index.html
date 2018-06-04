@@ -1,0 +1,38 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="judul col-sm-6">
+        <h1><b>Klasifikasi 8 Jenis Pattern Pada Kalung Leher Sapi</b></h1>
+    </div>
+    <div class="content">
+        <div class="card bg-dark text-white col-sm-6">
+            <div class="card-header">
+                <h4>Silahkan Upload Gambar Mu</h4>
+            </div>
+            <div class="card-body">
+                <form method=POST enctype=multipart/form-data action="{{ url_for('upload') }}">
+                    <div class="input-group image-preview">
+                        <input type="text" class="form-control image-preview-filename" disabled="disabled">
+                        <span class="input-group-btn">
+                            <button type="button" class="btn btn-default image-preview-clear" style="display:none;">
+                                <span class="glyphicon glyphicon-remove"></span> Clear
+                            </button>
+                            <div class="btn btn-default image-preview-input">
+                                <span class="glyphicon glyphicon-folder-open"></span>
+                                <span class="image-preview-input-title">Browse</span>
+                                <input type="file" accept="image/png, image/jpeg, image/gif, image/bmp" name="photo" onchange="readUrl(this)"/>
+                            </div>
+                        </span>
+                    </div>
+                    <br>
+                    <div class="float-right">
+                        <input type="submit" name="submit" class="btn btn-primary post-gambar" value="Upload"></input> 
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

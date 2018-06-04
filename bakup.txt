@@ -1,0 +1,183 @@
+from flask import Flask, render_template, request
+from flask_uploads import UploadSet, configure_uploads, IMAGES
+
+import sys
+import os
+import itertools
+import random
+from PIL import Image  # PIL
+from svmutil import *  # libSVM
+import cv2
+import numpy as np
+
+
+DIMENSION = 60
+ROOT_DIR = "/"
+
+PAT1 = "pattern1"
+PAT2 = "pattern2"
+PAT3 = "pattern3"
+PAT4 = "pattern4"
+PAT5 = "pattern5"
+PAT6 = "pattern6"
+PAT7 = "pattern7"
+PAT8 = "pattern8"
+CLASSES = [PAT1, PAT2, PAT3, PAT4, PAT5, PAT6, PAT7, PAT8]
+
+
+app = Flask(__name__)
+
+photos = UploadSet('photos', IMAGES)
+# ALLOWED_EXTENSIONS = set([ 'png', 'jpg', 'jpeg'])
+
+app.config['UPLOADED_PHOTOS_DEST'] = 'static/image'
+configure_uploads(app, photos)
+
+# def allowed_file(filename):
+#     return '.' in filename and \
+#            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST' and 'photo' in request.files:
+        file_name = photos.save(request.files['photo'])
+        location = 'static/image/' + file_name
+
+        hough_circle(location)
+
+        img = Image.open(location).resize((DIMENSION, DIMENSION))
+        img = list(itertools.chain.from_iterable(img.getdata()))
+        predClazz, prob = predict(models, img)
+        print(prob)
+        return render_template('hasil.html', filename=location ,kelas=str(predClazz))
+
+    return render_template('index.html')
+
+@app.route('/hasil')
+def hasil():
+    return render_template('hasil.html')
+
+def hough_circle(file_loc):
+
+    img = cv2.imread(file_loc, 0)
+    cropSize = (120, 120)
+
+    gray = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 300, param1=290, param2=55, minRadius=0, maxRadius=0)
+    circles = np.uint16(np.around(circles))
+
+    if(str(circles) == "None"):
+        circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 300, param1=330, param2=40, minRadius=0, maxRadius=0)
+        circles = np.uint16(np.around(circles))
+        for i in circles[0, :]:
+            # cv2.circle(gray, (i[0], i[1]), i[2], (0, 255, 0), 2)
+            # cv2.circle(gray, (i[0], i[1]), 2, (0, 0, 255), 3)
+            cropCoords = (
+            max(0, i[1] - cropSize[0] // 2), min(img.shape[0], i[1] + cropSize[0] // 2), max(0, i[0] - cropSize[1] // 2),
+            min(img.shape[1], i[0] + cropSize[1] // 2))
+            crop = gray[cropCoords[0]:cropCoords[1], cropCoords[2]:cropCoords[3]]
+    
+    else:
+        for i in circles[0, :]:
+            # cv2.circle(gray, (i[0], i[1]), i[2], (0, 255, 0), 2)
+            # cv2.circle(gray, (i[0], i[1]), 2, (0, 0, 255), 3)
+            cropCoords = (
+            max(0, i[1] - cropSize[0] // 2), min(img.shape[0], i[1] + cropSize[0] // 2), max(0, i[0] - cropSize[1] // 2),
+            min(img.shape[1], i[0] + cropSize[1] // 2))
+            crop = gray[cropCoords[0]:cropCoords[1], cropCoords[2]:cropCoords[3]]
+
+    cv2.imwrite(file_loc, crop)
+
+
+###############################  Sisdas  ###########################
+
+def classify(models, dataSet):
+    results = {}
+    for trueClazz in CLASSES:
+        count = 0
+        correct = 0
+        for item in dataSet[trueClazz]:
+            predClazz, prob = predict(models, item)
+            print ("%s,%s,%f" % (trueClazz, predClazz, prob))
+            count += 1
+            if trueClazz == predClazz: correct += 1
+        results[trueClazz] = (count, correct)
+    return results
+
+def predict(models, item):
+    maxProb = 0.0
+    bestClass = ""
+    for clazz, model in models.items():
+        output = svm_predict([0], [item], model, "-q -b 1")
+        prob = output[2][0][0]
+        if prob > maxProb:
+            maxProb = prob
+            bestClass = clazz
+    return (bestClass, maxProb)
+
+def getModels(trainingData):
+    models = {}
+    param = getParam()
+    for c in CLASSES:
+        labels, data = getTrainingData(trainingData, c)
+        prob = svm_problem(labels, data)
+        m = svm_train(prob, param)
+        models[c] = m
+    return models
+
+def getTrainingData(trainingData, clazz):
+    labeledData = getLabeledDataVector(trainingData, clazz, 1)
+    negClasses = [c for c in CLASSES if not c == clazz]
+    for c in negClasses:
+        ld = getLabeledDataVector(trainingData, c, -1)
+        labeledData += ld
+    random.shuffle(labeledData)
+    unzipped = [list(t) for t in zip(*labeledData)]
+    labels, data = unzipped[0], unzipped[1]
+    return (labels, data)
+
+def getParam():
+    param = svm_parameter("-q")
+    param.probability = 1
+    param.kernel_type = 2 # Radial Basis Function, real-valued function whose value depends only on the distance from the origin
+    param.C = .01
+    param.gamma = .00000001
+    return param
+
+def getLabeledDataVector(dataset, clazz, label):
+    data = dataset[clazz]
+    labels = [label] * len(data)
+    output = zip(labels, data)
+    return output
+
+
+def buildImageList(dirName):
+    for fileName in os.listdir(dirName):
+        hough_circle(dirName+fileName)
+    imgs = [Image.open(dirName + fileName).resize((DIMENSION, DIMENSION)) for fileName in os.listdir(dirName)]
+    imgs = [list(itertools.chain.from_iterable(img.getdata())) for img in imgs]
+    return imgs
+
+
+if __name__ == '__main__':
+    sign = True
+    models = {}
+
+    for i in CLASSES:
+        models[i] = svm_load_model("model_"+i)
+        if models[i] == None:
+            sign = False
+
+    if sign==False : 
+        trainingData = {}
+        for clazz in CLASSES:
+            train = buildImageList(ROOT_DIR + clazz + "/")
+            trainingData[clazz] = train
+
+        train = trainingData
+        models = getModels(trainingData)
+        
+        for clazz, model in models.items():
+            svm_save_model("model_"+clazz, model) 
+
+    app.run(debug = True)
